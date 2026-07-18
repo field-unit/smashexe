@@ -1,30 +1,19 @@
-# STONE.EXE — GitHub Pages package
+# SMASH.EXE — GitHub Pages package
 
-Create a new public repository called `stone-exe`, then upload:
-
+Create a new public repository called `smash-exe`, then upload:
 - `index.html`
 - `.nojekyll`
 
-to the repository root and publish from:
-
+Publish from:
 Settings → Pages → Deploy from a branch → main → /(root)
 
 Expected address:
+https://field-unit.github.io/smash-exe/
 
-https://field-unit.github.io/stone-exe/
-
-## Features
-
-- TempleOS-style grainy pixel presentation
-- First-person automatic night walk through a run-down Midlands town
-- Score by throwing stones through lit windows and bus stops
-- Streak / best / hit / accuracy tracking
-- Field Unit demo radio with:
-  - random opening track on fresh load
-  - full track playback
-  - SFX ON/OFF
-  - MUSIC ON/OFF
-  - SKIP TRACK
-- Mobile-friendly on-screen radio controls
-
-The music streams from the main `field-unit.github.io` repository.
+Features:
+- First-person Midlands night walk
+- Throw stones at windows and bus shelter panes for points
+- Grainy TempleOS-style visuals
+- Field Unit demo playback with SFX / MUSIC / SKIP controls
+- Random opening track on each fresh page load
+- Mobile-friendly overlay controls
