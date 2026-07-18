@@ -70,6 +70,76 @@ button:active{box-shadow:inset 3px 3px #555,inset -3px -3px #fff;transform:trans
  .smash-speaker{width:36px;height:24px}
  .smash-radio-buttons button{min-height:34px;padding:7px 3px}
 }
+
+/* ============ FIELD UNIT SHELL / TICKET BRIDGE ============ */
+.fu-gamebar{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  align-items:center;
+  gap:9px;
+  padding:8px 10px;
+  border-bottom:2px solid var(--cyan,#00aaaa);
+  background:var(--black,#000);
+  font-family:var(--font,"Press Start 2P",monospace);
+}
+.fu-gamebar button{
+  margin:0;
+  min-height:34px;
+  padding:7px 9px;
+  font-size:7px;
+  color:var(--black,#000);
+  background:var(--grey,#aaa);
+}
+.fu-goal{
+  min-width:0;
+  color:var(--white,#fff);
+  font-size:7px;
+  line-height:1.6;
+  text-align:center;
+}
+.fu-goal b{color:var(--yellow,#ffff55)}
+.fu-ticket{
+  color:var(--cyan,#00aaaa);
+  font-size:7px;
+  line-height:1.5;
+  text-align:right;
+  white-space:nowrap;
+}
+.fu-ticket.earned{color:var(--lime,#55ff55)}
+#fuTicketFlash{
+  position:fixed;
+  inset:50% auto auto 50%;
+  z-index:1000;
+  width:min(430px,calc(100% - 32px));
+  transform:translate(-50%,-50%) scale(.85);
+  padding:22px 18px;
+  border:5px double var(--white,#fff);
+  color:var(--yellow,#ffff55);
+  background:var(--blue,#0000aa);
+  box-shadow:0 0 0 5px var(--black,#000);
+  font-size:12px;
+  line-height:1.8;
+  text-align:center;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .12s steps(2,end),transform .12s steps(2,end);
+}
+#fuTicketFlash.on{
+  opacity:1;
+  transform:translate(-50%,-50%) scale(1);
+}
+@media(max-width:600px){
+  .fu-gamebar{
+    grid-template-columns:auto 1fr;
+  }
+  .fu-goal{
+    grid-column:1/-1;
+    grid-row:2;
+    text-align:left;
+    font-size:6px;
+  }
+  .fu-ticket{font-size:6px}
+}
 </style>
 </head>
 <body>
@@ -78,6 +148,13 @@ button:active{box-shadow:inset 3px 3px #555,inset -3px -3px #fff;transform:trans
     <span>SMASH.EXE // MIDLANDS NIGHT WALK</span>
     <span id="clock">00:00:00</span>
   </div>
+
+  <div class="fu-gamebar">
+    <button id="fuBack" type="button">← FIELD UNIT</button>
+    <div class="fu-goal"><b>TICKET GOAL:</b> REACH 1,000 POINTS</div>
+    <div class="fu-ticket" id="fuTicketStatus">TICKET 0 / 1</div>
+  </div>
+  <div id="fuTicketFlash" aria-live="assertive">TICKET EARNED<br>SMASHEXE</div>
   <div class="main">
     <section class="view">
       <canvas id="game" width="640" height="480" aria-label="Midlands night walk stone throwing game"></canvas>
@@ -255,11 +332,14 @@ function setTrack(index){
     bgm.play().catch(()=>{ ui.nowTrack.textContent="TAP TO START RADIO"; ui.screenTrack.textContent="TAP TO START"; });
   }
 }
-function startMusic(){ if(musicStarted) return; musicStarted=true; setTrack(Math.floor(Math.random()*PLAYLIST.length)); }
+function startMusic(){
+  if(fuRadio("start"))return; if(musicStarted) return; musicStarted=true; setTrack(Math.floor(Math.random()*PLAYLIST.length)); }
 function nextTrack(){ setTrack(trackIndex+1); }
 function toggleSound(){ soundOn=!soundOn; syncAudioControls(); if(soundOn){ ensureAudio(); tone(460,.06,.04,"square",70);} }
-function toggleMusic(){ musicOn=!musicOn; syncAudioControls(); if(musicOn){ startMusic(); bgm.volume=.34; bgm.play().catch(()=>{});} else bgm.pause(); }
+function toggleMusic(){
+  if(fuRadio("toggle"))return; musicOn=!musicOn; syncAudioControls(); if(musicOn){ startMusic(); bgm.volume=.34; bgm.play().catch(()=>{});} else bgm.pause(); }
 function skipTrack(){
+  if(fuRadio("skip"))return;
   if(!musicOn){ musicOn=true; syncAudioControls(); }
   if(!musicStarted) startMusic(); else nextTrack();
   bgm.volume=.34; bgm.play().catch(()=>{});
@@ -296,7 +376,7 @@ function resolveThrow(x,y){
     hitTarget.broken=true; hitTarget.respawnAt=now()+4500+Math.random()*2200;
     stats.hits++; stats.streak++; stats.best=Math.max(stats.best,stats.streak);
     const gained=hitTarget.value + Math.max(0,(stats.streak-1)*15);
-    stats.score+=gained; updateStats(); glassSmash(); setStatus("SMASH!",800);
+    stats.score+=gained; updateStats(); if(stats.score>=1000)fuAwardTicket(); glassSmash(); setStatus("SMASH!",800);
     const kind=hitTarget.type==="bus"?"BUS STOP":hitTarget.type==="shop"?"SHOP FRONT":"WINDOW";
     log(`${kind} // +${gained} PTS`, gained>=170?"great":"good");
   }else{
@@ -438,6 +518,76 @@ function clock(){
   ui.clock.textContent=[d.getHours(),d.getMinutes(),d.getSeconds()].map(v=>String(v).padStart(2,"0")).join(":");
 }
 initTargets(); updateStats(); syncAudioControls(); clock(); setInterval(clock,1000); requestAnimationFrame(loop);
+
+/* ---------- shared Field Unit shell + ticket bridge ---------- */
+const FU_GAME_ID="smashexe";
+const FU_GAME_TITLE="SMASHEXE";
+const FU_GAME_GOAL="REACH 1,000 POINTS";
+const FU_TICKET_KEY="fieldUnitTicketsV1";
+const FU_EMBEDDED=window.parent!==window;
+
+function fuReadTickets(){
+  try{
+    const value=JSON.parse(localStorage.getItem(FU_TICKET_KEY)||"{}");
+    return value&&typeof value==="object"?value:{};
+  }catch(err){return {};}
+}
+function fuHasTicket(){return !!fuReadTickets()[FU_GAME_ID];}
+function fuUpdateTicketUI(){
+  const el=document.getElementById("fuTicketStatus");
+  if(!el)return;
+  const earned=fuHasTicket();
+  el.textContent=earned?"TICKET 1 / 1":"TICKET 0 / 1";
+  el.classList.toggle("earned",earned);
+}
+function fuAwardTicket(){
+  const tickets=fuReadTickets();
+  if(tickets[FU_GAME_ID]){fuUpdateTicketUI();return false;}
+  tickets[FU_GAME_ID]={earnedAt:Date.now(),goal:FU_GAME_GOAL};
+  try{localStorage.setItem(FU_TICKET_KEY,JSON.stringify(tickets));}catch(err){}
+  fuUpdateTicketUI();
+  const flash=document.getElementById("fuTicketFlash");
+  if(flash){
+    flash.classList.add("on");
+    setTimeout(()=>flash.classList.remove("on"),2100);
+  }
+  if(FU_EMBEDDED){
+    window.parent.postMessage({type:"FU_TICKET",game:FU_GAME_ID},"*");
+  }
+  return true;
+}
+function fuRadio(action){
+  if(!FU_EMBEDDED)return false;
+  window.parent.postMessage({type:"FU_RADIO",action},"*");
+  return true;
+}
+function fuApplyRadioState(state){
+  if(!state)return;
+  musicOn=!!state.musicOn;
+  musicStarted=!!state.started;
+  trackIndex=Number.isFinite(state.trackIndex)?state.trackIndex:0;
+  const title=state.title||"WAITING FOR INPUT";
+  const artist=state.artist||"FIELD UNIT";
+  if(ui.screenTrack)ui.screenTrack.textContent=title;
+  if(ui.nowTrack)ui.nowTrack.textContent=title;
+  if(ui.nowArtist)ui.nowArtist.textContent=artist;
+  try{syncAudioControls();}catch(err){}
+}
+window.addEventListener("message",event=>{
+  const data=event.data||{};
+  if(data.type==="FU_RADIO_STATE")fuApplyRadioState(data.state);
+  if(data.type==="FU_TICKET_STATE")fuUpdateTicketUI();
+});
+const fuBack=document.getElementById("fuBack");
+if(fuBack){
+  fuBack.addEventListener("click",()=>{
+    if(FU_EMBEDDED)window.parent.postMessage({type:"FU_CLOSE_GAME"},"*");
+    else window.location.href="https://field-unit.github.io/";
+  });
+}
+fuUpdateTicketUI();
+if(FU_EMBEDDED)window.parent.postMessage({type:"FU_RADIO",action:"state"},"*");
+
 })();
 </script>
 </body>

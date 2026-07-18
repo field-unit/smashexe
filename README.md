@@ -1,19 +1,11 @@
-# SMASH.EXE — GitHub Pages package
+# SMASHEXE — Field Unit shell/ticket update
 
-Create a new public repository called `smash-exe`, then upload:
-- `index.html`
-- `.nojekyll`
+Replace the current `index.html` in the `smashexe` repository.
 
-Publish from:
-Settings → Pages → Deploy from a branch → main → /(root)
-
-Expected address:
-https://field-unit.github.io/smash-exe/
-
-Features:
-- First-person Midlands night walk
-- Throw stones at windows and bus shelter panes for points
-- Grainy TempleOS-style visuals
-- Field Unit demo playback with SFX / MUSIC / SKIP controls
-- Random opening track on each fresh page load
-- Mobile-friendly overlay controls
+Changes:
+- Adds a FIELD UNIT back button.
+- Uses the persistent parent-site radio when opened from the homepage.
+- Keeps standalone music playback when opened directly.
+- Adds the shared ticket goal:
+  REACH 1,000 POINTS
+- Saves the ticket in browser storage so it persists between games.
